@@ -2,11 +2,13 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import * as express from 'express';
+import mongoose from 'mongoose';
 
 import { MyLogger } from './logger/logger';
-import { LoggerMiddleware } from './middleware/logger.middleware'; 
-import { LoggerInterceptor } from './interceptor/logger.interceptor'; 
+import { LoggerMiddleware } from './middleware/logger.middleware';
+import { LoggerInterceptor } from './interceptor/logger.interceptor';
 
+mongoose.set('useFindAndModify', false)
 async function bootstrap() {
     const app = await NestFactory.create(AppModule);
     app.use(express.json());

@@ -4,6 +4,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import {NftSchema} from '../schema/nft.schema';
 import { NftHttp } from '../http/lcd/nft.http';
 import { DenomSchema } from '../schema/denom.schema';
+import { TxSchema } from '../schema/tx.schema';
 
 @Module({
     imports:[
@@ -15,7 +16,11 @@ import { DenomSchema } from '../schema/denom.schema';
             name: 'Denom',
             schema: DenomSchema,
             collection: 'ex_sync_denom'
-        }])
+        },{
+            name: 'Tx',
+            schema: TxSchema,
+            collection: 'sync_tx'
+        },])
     ],
     providers:[NftTaskService, NftHttp],
     exports:[NftTaskService]

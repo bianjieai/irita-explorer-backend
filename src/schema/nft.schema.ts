@@ -18,6 +18,8 @@ export const NftSchema = new mongoose.Schema({
     owner: String,
     uri: String,
     data: String,
+    last_block_height: Number,
+    last_block_time: Number,
     create_time: Number,
     update_time: Number,
     hash: String,
@@ -164,5 +166,31 @@ NftSchema.statics = {
 
     async queryNftCount(denomId: string): Promise<INftStruct>{
         return await this.find({denom_id:denomId}).countDocuments().exec();
-    }
+    },
+
+    async queryLastBlockHeight(): Promise<INftStruct>{
+        return await this.find({},{last_block_height: 1}).sort({last_block_height: -1}).limit(1);
+    },
+
+    updateNft(nft: any){
+        let cond = {
+            denom_id:nft.denom_id,
+            nft_id:nft.nft_id,
+        };
+        return this.findOneAndUpdate(cond,nft,{ upsert:true,new: true});
+    },
+
+    deleteNft(nft: any){
+        let cond = {
+            denom_id:nft.denom_id,
+            nft_id:nft.nft_id,
+        };
+        return this.deleteOne(cond);
+    },
+
+
+
+
+
+
 };

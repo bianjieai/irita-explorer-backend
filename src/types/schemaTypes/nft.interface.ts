@@ -13,6 +13,8 @@ export interface INftStruct {
     owner?: string,
     uri?: string,
     data?: string,
+    last_block_height?: number,
+    last_block_time?: number,
     create_time?: number,
     update_time?: number,
     hash?: string,

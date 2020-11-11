@@ -163,3 +163,7 @@ export const ValidatorNumberStatus = {
 export const activeValidatorLabel = 'active'
 export const candidateValidatorLabel = 'candidate'
 export const jailedValidatorLabel = 'jailed'
+
+export const INCREASE_HEIGHT = Number(cfg.taskCfg.increaseHeight);
+export const INTERVAL_HEIGHT = Number(cfg.taskCfg.intervalHeight);
+export const MAX_OPERATE_TX_COUNT = Number(cfg.taskCfg.maxOperateTxCount);

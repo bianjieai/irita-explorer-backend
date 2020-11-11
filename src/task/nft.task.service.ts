@@ -7,175 +7,120 @@ import { IDenom, IDenomStruct } from '../types/schemaTypes/denom.interface';
 import md5 from 'blueimp-md5';
 import { getTimestamp } from '../util/util';
 import { ILcdNftStruct } from '../types/task.interface';
+import { ITxStruct } from '../types/schemaTypes/tx.interface';
+import { INCREASE_HEIGHT, MAX_OPERATE_TX_COUNT, TxType } from '../constant';
 
 @Injectable()
 export class NftTaskService {
     constructor(@InjectModel('Nft') private nftModel: Model<INft>,
-                @InjectModel('Denom') private denomModel: Model<IDenom>,
-                private readonly nftHttp: NftHttp,
+                @InjectModel('Tx') private txModel: any,
+                @InjectModel('Denom') private denomModel: any,
     ) {
         this.doTask = this.doTask.bind(this);
     }
 
     async doTask(): Promise<void> {
-        const denomList: IDenomStruct[] = await (this.denomModel as any).findAllNames();
-        if (denomList && denomList.length > 0) {
-            for(let denom of denomList){
-                const res: any = await this.nftHttp.queryNftsFromLcdByDenom(denom.denom_id);
-                const nftFromDb: INftStruct[] = await (this.nftModel as any).findListByName(denom.denom_id);
-                if (res) {
-                    let lcdNftMap: Map<string, ILcdNftStruct> | null = new Map<string, ILcdNftStruct>(),
-                        dbNftMap: Map<string, INftStruct> | null = new Map<string, INftStruct>();
-                    if (res.nfts && Array.isArray(res.nfts) && res.nfts.length > 0) {
-                        res.nfts.forEach(nft => {
-                            nft.denom_id = res.denom.id;
-                            nft.denom_name = res.denom.name;
-                            lcdNftMap.set(NftTaskService.getNftKey({nft_id:nft.id,denom_id:res.denom.id}), nft);
-                        });
-                    } else {
-                        lcdNftMap = null;
-                    }
-
-                    if (nftFromDb.length > 0) {
-                        nftFromDb.forEach((nft: INftStruct) => {
-                            dbNftMap.set(NftTaskService.getNftKey(nft), nft);
-                        });
-                    } else {
-                        dbNftMap = null;
-                    }
-
-                    let shouldInsertMap: Map<string, ILcdNftStruct> = NftTaskService.getShouldInsertList(lcdNftMap, dbNftMap);
-                    let shouldDeleteNftMap: Map<string, INftStruct> = NftTaskService.getShouldDeleteList(lcdNftMap, dbNftMap);
-                    let shouldUpdateNftMap: Map<string, ILcdNftStruct> = NftTaskService.getShouldUpdateList(lcdNftMap, dbNftMap);
-                    await this.saveNft(denom.denom_id,denom.name, shouldInsertMap);
-                    await this.deleteNft(denom.denom_id, shouldDeleteNftMap);
-                    await this.updateNft(denom.denom_id,denom.name, shouldUpdateNftMap);
-                }
-            }
-
+        const nftList: INftStruct[] = await (this.nftModel as any).queryLastBlockHeight();
+        let lastBlockHeight = 0;
+        if (nftList && nftList.length > 0) {
+            lastBlockHeight = nftList[0].last_block_height;
+        } else {
+            lastBlockHeight = 0;
         }
-    }
-
-    private async saveNft(denomId: string, denomName: string, shouldInsertMap: Map<string, ILcdNftStruct>): Promise<void> {
-        if (shouldInsertMap && shouldInsertMap.size > 0) {
-            let insertNftList: INftStruct[] = Array.from(shouldInsertMap.values()).map((nft) => {
-                const { owner, uri, data, id, name } = nft;
-                const str: string = `${name}${owner}${uri ? uri : ''}${data ? data : ''}`,
-                    hash = md5(str);
-                return {
-                    denom_id: denomId,
-                    denom_name: denomName || '',
-                    nft_id: id,
-                    nft_name: name,
-                    owner: owner,
-                    uri: uri ? uri : '',
-                    data: data ? data : '',
-                    create_time: getTimestamp(),
-                    update_time: getTimestamp(),
-                    hash,
-                };
-            });
-            await (this.nftModel as any).saveBulk(insertNftList);
+        //查询最高区块, 当递加的高度超过最大交易height的时候, 需要停止查询
+        let maxHeight = 0;
+        const txList = await (this.txModel as any).queryMaxNftTxList();
+        if (txList && txList.length > 0 && txList[0].height > 0) {
+            maxHeight = txList[0].height;
+        } else {
+            //如果高度未查出, 会出现超出tx高度以后一直递加查询仍然达不到 所需要的交易的数量, 会陷入死循环, 需要直接抛出错误
+            throw 'the max height of nft tx has not been queried!';
         }
-    }
-
-    private async deleteNft(denomId: string, shouldDeleteNftMap: Map<string, INftStruct>): Promise<void> {
-        if (shouldDeleteNftMap && shouldDeleteNftMap.size > 0) {
-            for(let nft of Array.from(shouldDeleteNftMap.values())){
-                await (this.nftModel as any).deleteOneByDenomAndId({
-                    nft_id: nft.nft_id,
-                    denom_id: denomId,
+        let nftTxList: ITxStruct[] = await this.getNftTxList(lastBlockHeight, maxHeight);
+        if (nftTxList && nftTxList.length > 0) {
+            const denomList: IDenomStruct[] = await (this.denomModel as any).findList(0, 0, '', 'true');
+            let denomMap = new Map<string, string>();
+            if (denomList && denomList.length > 0) {
+                denomList.forEach((denom: IDenomStruct) => {
+                    denomMap.set(denom.denom_id, denom.name);
                 });
             }
+            await this.handleNftTx(nftTxList, denomMap);
         }
     }
 
-    private async updateNft(denomId: string, denomName: string,shouldUpdateNftMap: Map<string, ILcdNftStruct>): Promise<void> {
-        if (shouldUpdateNftMap && shouldUpdateNftMap.size > 0) {
-            for(let nft of Array.from(shouldUpdateNftMap.values())){
-                const { id, owner, uri, data, hash, name } = nft;
-                const nftEntity: INftStruct = {
-                    nft_id: id,
-                    nft_name: name,
-                    owner: owner,
-                    uri: uri,
-                    data: data,
-                    hash: hash,
-                    denom_id: denomId,
-                    denom_name: denomName || '',
-                };
-                await (this.nftModel as any).updateOneById(nftEntity);
-            }
-        }
-    }
+    async getNftTxList(lastBlockHeight: number, maxHeight: number): Promise<ITxStruct[]> {
 
-    private static getShouldDeleteList(nftFromLcd: Map<string, ILcdNftStruct> | null, nftFromDb: Map<string, INftStruct> | null): Map<string, INftStruct> {
-        if (!nftFromDb) {
-            //如果db中已经没有nft, 则不需要执行delete操作
-            return new Map<string, INftStruct>();
-        } else {
-            if (!nftFromLcd) {//如果从Lcd返回的Nft已经没有了, 则需要删除db中查出的所有的
-                return nftFromDb;
-            } else {
-                const deleteNftMap = new Map<string, INftStruct>();
-                for (let nft_db of nftFromDb.values()) {
-                    let nftKey = NftTaskService.getNftKey({denom_id:nft_db.denom_id,nft_id:nft_db.nft_id});
-                    if (!nftFromLcd.has(nftKey)) {
-                        deleteNftMap.set(nftKey, nft_db);
-                    }
+        let list: any[] = [];
+        const querynftTxList = async (lastBlockHeight: number) => {
+            const nftTxList: ITxStruct[] = await this.queryNftTxList(lastBlockHeight);
+            list = list.concat(nftTxList);
+            console.log('tx list length:', list.length, 'last block height:', lastBlockHeight);
+            if (list.length <= MAX_OPERATE_TX_COUNT) {
+                lastBlockHeight += INCREASE_HEIGHT;
+                if (lastBlockHeight <= maxHeight) {
+                    await querynftTxList(lastBlockHeight);
                 }
-                return deleteNftMap;
             }
-        }
+        };
+        await querynftTxList(lastBlockHeight);
+
+        return list;
     }
 
-    private static getShouldInsertList(nftFromLcd: Map<string, ILcdNftStruct> | null, nftFromDb: Map<string, INftStruct> | null): Map<string, ILcdNftStruct> {
-        if (!nftFromDb) {
-            return nftFromLcd;
-        } else {
-            if (!nftFromLcd) {
-                return new Map<string, ILcdNftStruct>();
-            } else {
-                const insertNftMap = new Map<string, ILcdNftStruct>();
-                for (let nft_lcd of nftFromLcd.values()) {
-                    let nftKey = NftTaskService.getNftKey({denom_id:nft_lcd.denom_id,nft_id:nft_lcd.id});
-                    if (!nftFromDb.has(nftKey)) {
-                        insertNftMap.set(nftKey, nft_lcd);
-                    }
+    async queryNftTxList(lastBlockHeight: number): Promise<ITxStruct[]> {
+        return await (this.txModel as any).queryNftTxList(lastBlockHeight);
+    }
+
+    async handleNftTx(nftTxList: ITxStruct[], denomMap: Map<string, string>): Promise<void> {
+        return new Promise((resolve) => {
+            const promiseList: Promise<any>[] = [];
+            const nftObj = {};
+            nftTxList.forEach((tx) => {
+                const { msg } = (tx.msgs as any);
+                const idStr = `${msg.denom}-${msg.id}`;
+                if (!nftObj[idStr]) nftObj[idStr] = {};
+                if ((tx.msgs as any).type === TxType.mint_nft) {
+                    nftObj[idStr].denom_id = msg.denom;
+                    nftObj[idStr].denom_name = denomMap.get(msg.denom);
+                    nftObj[idStr].nft_id = msg.id;
+                    nftObj[idStr].nft_name = msg.name;
+                    nftObj[idStr].owner = msg.sender;
+                    nftObj[idStr].uri = msg.uri;
+                    nftObj[idStr].data = msg.data;
+                    nftObj[idStr].is_deleted = false;
+                } else if ((tx.msgs as any).type === TxType.edit_nft) {
+                    nftObj[idStr].nft_name = msg.name;
+                    nftObj[idStr].uri = msg.uri;
+                    nftObj[idStr].data = msg.data;
+                } else if ((tx.msgs as any).type === TxType.transfer_nft) {
+                    nftObj[idStr].owner = msg.sender;
+                } else if ((tx.msgs as any).type === TxType.burn_nft) {
+                    nftObj[idStr].is_deleted = true;
                 }
-                return insertNftMap;
-            }
-        }
-    }
+                nftObj[idStr].last_block_height = tx.height;
+                nftObj[idStr].last_block_time = tx.time;
+                nftObj[idStr].create_time = getTimestamp();
+                nftObj[idStr].update_time = getTimestamp();
+            });
 
-    private static getShouldUpdateList(nftFromLcd: Map<string, ILcdNftStruct> | null, nftFromDb: Map<string, INftStruct> | null): Map<string, ILcdNftStruct> {
-        if (!nftFromDb) {
-            return new Map<string, ILcdNftStruct>();
-        } else {
-            if (!nftFromLcd) {
-                return new Map<string, ILcdNftStruct>();
-            } else {
-                const updateNftMap = new Map<string, ILcdNftStruct>();
-                for (let nft_lcd of nftFromLcd.values()) {
-                    let nftKey = NftTaskService.getNftKey({denom_id:nft_lcd.denom_id,nft_id:nft_lcd.id});
-                    if (nftFromDb.has(nftKey)) {
-                        const { name, owner, data, uri, denom_name } = nft_lcd,
-                            lcdStr = `${name}${denom_name}${owner}${uri ? uri : ''}${data ? data : ''}`,
-                            lcdHash = md5(lcdStr);
-                        if (nftFromDb.get(nftKey).hash !== lcdHash) {
-                            let tempLcdNft: ILcdNftStruct = nft_lcd;
-                            tempLcdNft.hash = lcdHash;
-                            updateNftMap.set(nftKey, tempLcdNft);
-                        }
-                    }
+            for (let idStr in nftObj) {
+                if (nftObj[idStr].is_deleted) {
+                    promiseList.push((this.nftModel as any).deleteNft(nftObj[idStr]));
+                } else {
+                    promiseList.push((this.nftModel as any).updateNft(nftObj[idStr]));
                 }
-                return updateNftMap;
             }
-        }
+            Promise.all(promiseList).then(res => {
+                if (res) {
+                    console.log('Done!');
+                    resolve();
+                }
+            });
+
+        });
     }
 
-    private static getNftKey(nft:INftStruct): string {
-        return `${nft.denom_id}#${nft.nft_id}`;
-    }
+
 }
 
