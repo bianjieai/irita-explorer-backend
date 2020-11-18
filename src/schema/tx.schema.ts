@@ -911,12 +911,9 @@ TxSchema.statics.queryNftTxList = async function (lastBlockHeight: number): Prom
         {
             $match:{
                 status: TxStatus.SUCCESS,
-                $or:[
-                    {'msgs.type':TxType.mint_nft},
-                    {'msgs.type':TxType.edit_nft},
-                    {'msgs.type':TxType.transfer_nft},
-                    {'msgs.type':TxType.burn_nft},
-                ],
+                'msgs.type':{
+                    $in:[TxType.mint_nft, TxType.edit_nft, TxType.transfer_nft, TxType.burn_nft]
+                },
                 height: {$gt: lastBlockHeight, $lte: lastBlockHeight + INCREASE_HEIGHT}
             }
         },
@@ -926,12 +923,9 @@ TxSchema.statics.queryNftTxList = async function (lastBlockHeight: number): Prom
 
         {
             $match:{
-                $or:[
-                    {'msgs.type':TxType.mint_nft},
-                    {'msgs.type':TxType.edit_nft},
-                    {'msgs.type':TxType.transfer_nft},
-                    {'msgs.type':TxType.burn_nft},
-                ],
+                'msgs.type':{
+                    $in:[TxType.mint_nft, TxType.edit_nft, TxType.transfer_nft, TxType.burn_nft]
+                },
             }
         },
         {
