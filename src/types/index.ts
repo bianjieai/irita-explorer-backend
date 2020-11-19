@@ -26,3 +26,9 @@ export interface IRandomKey {
     key: string;
     step: number;
 }
+
+export interface IMongooseUpdate {
+    n: number,
+    nModified: number,
+    ok: number,
+}

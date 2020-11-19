@@ -68,6 +68,8 @@ TxSchema.statics.queryTxList = async function(query: ITxsQuery): Promise<IListSt
     if (query.type && query.type.length) {
         queryParameters['msgs.type'] = query.type;
     } else {
+
+        //todo(lvshenchao) or --> in
         queryParameters.$or = [{ 'msgs.type' : filterExTxTypeRegExp() }];
     }
     if (query.status && query.status.length) {
@@ -240,6 +242,7 @@ TxSchema.statics.queryTxWithAddress = async function(query: ITxsWithAddressQuery
     if (query.type && query.type.length) {
         queryParameters['msgs.type'] = query.type;
     } else {
+        //todo(lvshenchao) or --> in
         queryParameters.$or = [{ 'msgs.type': filterExTxTypeRegExp() }];
     }
     if (query.status && query.status.length) {
@@ -278,6 +281,7 @@ TxSchema.statics.queryTxWithContextId = async function(query: ITxsWithContextIdQ
     if (query.type && query.type.length) {
         queryParameters['msgs.type'] = query.type;
     } else {
+        //todo(lvshenchao) or --> in
         queryParameters.$or = [{ 'msgs.type': filterExTxTypeRegExp() }];
     }
 
@@ -310,7 +314,7 @@ TxSchema.statics.queryTxWithNft = async function(query: ITxsWithNftQuery): Promi
         TxType.transfer_nft,
         TxType.burn_nft,
     ];
-
+//todo(lvshenchao) or --> in
     let queryParameters: { 'msgs.msg.denom'?: string, 'msgs.msg.id'?: string, $or: object[] } = { $or: [{ 'msgs.type': filterTxTypeRegExp(nftTypesList) }] };
     if (query.denomId && query.denomId.length) {
         queryParameters['msgs.msg.denom'] = query.denomId;
@@ -485,6 +489,7 @@ TxSchema.statics.findCallServiceTxWithReqContextIds = async function(reqContextI
 //定时任务, 查询所有关于service的tx
 TxSchema.statics.findAllServiceTx = async function(pageSize?: number): Promise<ITxStruct[]> {
     pageSize = pageSize || cfg.taskCfg.syncTxServiceNameSize;
+    //todo(lvshenchao) or --> in
     let queryParameters: any = {
         $or: [
             { 'type': TxType.define_service },
@@ -940,6 +945,7 @@ TxSchema.statics.queryNftTxList = async function (lastBlockHeight: number): Prom
 };
 
 TxSchema.statics.queryMaxNftTxList = async function (): Promise<ITxStruct[]>  {
+    //todo(lvshenchao) or --> in
     return await this.find({
         $or:[
             {'msgs.type':TxType.mint_nft},

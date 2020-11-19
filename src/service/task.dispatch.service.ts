@@ -6,7 +6,7 @@ import { getIpAddress, getTimestamp } from '../util/util';
 import { TaskEnum } from '../constant';
 import { cfg } from '../config/config';
 import { Logger } from '../logger';
-import { IRandomKey } from '../types';
+import { IMongooseUpdate, IRandomKey } from '../types';
 import { DispatchFaultTolerance } from '../types/task.interface';
 
 @Injectable()
@@ -23,10 +23,11 @@ export class TaskDispatchService {
                 Logger.log(`${name}: previous task is executing, the next should not be executed!`);
                 return false;
             } else {
-                const updated: boolean = await this.lock(name);
-                if (updated) {
+                const {nModified, ok}: IMongooseUpdate | null = await this.lock(name);
+                if(nModified === 1 && ok === 1){
+                    Logger.log(`${name}: locked successfully, start to execute task`);
                     return true;
-                } else {
+                }else{
                     return false;
                 }
             }
@@ -35,10 +36,11 @@ export class TaskDispatchService {
             const registered = await this.registerTask(name);
             Logger.log(`${name}: register successfully? ${registered}`);
             if (registered) {
-                const updated: boolean = await this.lock(name);
-                if (updated) {
+                const {nModified, ok}: IMongooseUpdate | null = await this.lock(name);
+                if(nModified === 1 && ok === 1){
+                    Logger.log(`${name}: locked successfully, start to execute task`);
                     return true;
-                } else {
+                }else{
                     return false;
                 }
             } else {
@@ -62,11 +64,11 @@ export class TaskDispatchService {
         return await (this.taskDispatchModel as any).createOne(task);
     }
 
-    private async lock(name: TaskEnum): Promise<boolean> {
+    async lock(name: TaskEnum): Promise<IMongooseUpdate> {
         return await (this.taskDispatchModel as any).lock(name);
     }
 
-    async unlock(name: TaskEnum, randomKey?: IRandomKey): Promise<boolean> {
+    async unlock(name: TaskEnum, randomKey?: IRandomKey): Promise<IMongooseUpdate> {
         return await (this.taskDispatchModel as any).unlock(name, randomKey);
     }
 
