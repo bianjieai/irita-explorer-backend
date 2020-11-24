@@ -19,6 +19,7 @@ export const IdentitySchema = new mongoose.Schema({
   update_time: Number,
 })
 IdentitySchema.index({identities_id: 1},{unique: true})
+IdentitySchema.index({owner: 1})
 IdentitySchema.statics = {
   async queryIdentityList(query:ITXWithIdentity):Promise<IListStruct> {
     const result: IListStruct = {}

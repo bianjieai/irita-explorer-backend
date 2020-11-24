@@ -13,6 +13,7 @@ export const DenomSchema = new mongoose.Schema({
     create_time: Number,
     update_time: Number,
 }, { versionKey: false });
+//denom 数量很少, 不需要加索引, 扫描速度更快
 
 DenomSchema.statics = {
     async findList(

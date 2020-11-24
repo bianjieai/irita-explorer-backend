@@ -16,6 +16,7 @@ export const TaskDispatchSchema = new mongoose.Schema({
     task_end_time: Number,
     heartbeat_update_time: Number,
 },{versionKey: false});
+//数量很少, 不需要加Index
 
 TaskDispatchSchema.statics = {
     async findOneByName(name: TaskEnum): Promise<ITaskDispatchStruct | null> {

@@ -11,7 +11,8 @@ export const ValidatorSchema = new mongoose.Schema({
     details:String,
     hash:String
 })
-ValidatorSchema.index({name: 1},{unique: true})
+//ValidatorSchema.index({name: 1},{unique: true})
+//此表数据很少, 不需要加Index
 
 ValidatorSchema.statics.findValidators = async function (query:IValidatorsQueryParams):Promise<{count?: number, data?:IValidatorsStruct[]}> {
     let result: { count?: number,data?: Array<IValidatorsStruct> } = { }

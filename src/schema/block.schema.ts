@@ -8,6 +8,8 @@ export const BlockSchema = new mongoose.Schema({
     time: Number,
 }, { versionKey: false });
 
+BlockSchema.index({height: 1}, {unique: 1});
+
 BlockSchema.statics = {
     async findList(pageNum: number, pageSize: number): Promise<IBlockStruct[]> {
         return await this.find({})
