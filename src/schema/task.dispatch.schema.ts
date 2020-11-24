@@ -3,7 +3,7 @@ import { getIpAddress, getTimestamp } from '../util/util';
 import { ITaskDispatchStruct } from '../types/schemaTypes/task.dispatch.interface';
 import { TaskEnum } from 'src/constant';
 import { Logger } from '../logger';
-import { IRandomKey } from '../types';
+import { IMongooseUpdate, IRandomKey } from '../types';
 import { taskLoggerHelper } from '../helper/task.log.helper';
 import moment from 'moment';
 
@@ -25,55 +25,20 @@ TaskDispatchSchema.statics = {
     async createOne(t: ITaskDispatchStruct): Promise<ITaskDispatchStruct | null> {
         return new this(t).save();
     },
-    async lock(name: TaskEnum): Promise<boolean> {
-        return new Promise(async (res)=>{
-            return await this.update({ name, is_locked: false }, {
-                // condition: is_locked: false, those server whose query's is_locked is true should not to be updated;
-                is_locked: true,
-                task_begin_time: getTimestamp(),
-                device_ip: getIpAddress(),
-            }, null, (error,effect)=>{
-                if(error) {
-                    res(false);
-                    return;
-                }
-                if(effect && effect.nModified === 1){
-                    res(true);
-                    Logger.log(`From task.dispatch.schema ${name} task begin time: ${new Date().getTime()}`);
-                }else {
-                    res(false);
-                }
-            }).exec();
+    async lock(name: TaskEnum): Promise<IMongooseUpdate> {
+        return await this.update({ name, is_locked: false }, {
+            // condition: is_locked: false, those server whose query's is_locked is true should not to be updated;
+            is_locked: true,
+            task_begin_time: getTimestamp(),
+            device_ip: getIpAddress(),
         });
-
-
     },
 
-    async unlock(name: TaskEnum, randomKey?: IRandomKey): Promise<boolean> {
-        return new Promise(async (res)=>{
-            //console.log('before updated unlock:',await this.find({ name}))
-            return await this.update({ name, is_locked: true }, {
-                is_locked: false,
-                task_end_time: getTimestamp(),
-            }, null, (error,effect)=>{
-                if(error) {
-                    taskLoggerHelper(`${name}: unlock error`, randomKey);
-                    res(false);
-                    return;
-                }
-
-                //TODO(lvshenchao) it seems like that there is a bug in mongoose, the params of nModified returned 0 while record was be updated
-                console.log('updated unlock:',effect);
-                //console.log('updated unlock:',await this.find({ name}))
-                if(effect && effect.nModified === 1){
-                    taskLoggerHelper(`${name}: unlock successful, From task.dispatch.schema ${name} task end time: ${new Date().getTime()}`, randomKey);
-                    res(true);
-                }else {
-                    taskLoggerHelper(`${name}: unlock failed`, randomKey);
-                    res(false);
-                }
-            }).exec();
-        })
+    async unlock(name: TaskEnum): Promise<IMongooseUpdate> {
+        return await this.update({ name, is_locked: true }, {
+            is_locked: false,
+            task_end_time: getTimestamp(),
+        });
     },
 
     async releaseLockByName(name: TaskEnum): Promise<ITaskDispatchStruct | null> {

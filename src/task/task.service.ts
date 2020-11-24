@@ -14,7 +14,7 @@ import { IdentityTaskService } from './idnetity.task.service';
 import {StakingValidatorTaskService} from "./staking.validator.task.service";
 import {ParametersTaskService} from "./parameters.task.service";
 import {TokensTaskService} from "./tokens.service";
-import { IRandomKey } from '../types';
+import { IMongooseUpdate, IRandomKey } from '../types';
 import { taskLoggerHelper } from '../helper/task.log.helper';
 
 @Injectable()
@@ -115,8 +115,8 @@ export class TasksService {
                 }, cfg.taskCfg.interval.heartbeatRate);
                 await doTask(taskName, randomKey);
                 //weather task is completed successfully, lock need to be released;
-                const unlock: boolean = await this.taskDispatchService.unlock(taskName, randomKey);
-                taskLoggerHelper(`${taskName}: (ip: ${getIpAddress()}, pid: ${process.pid}) has released the lock? ${unlock}`, randomKey)
+                const {nModified, ok}: IMongooseUpdate = await this.taskDispatchService.unlock(taskName, randomKey);
+                taskLoggerHelper(`${taskName}: (ip: ${getIpAddress()}, pid: ${process.pid}) has released the lock? ${nModified == 1 && ok === 1}`, randomKey)
                 if (this[`${taskName}_timer`]) {
                     clearInterval(this[`${taskName}_timer`]);
                     this[`${taskName}_timer`] = null;
@@ -125,8 +125,8 @@ export class TasksService {
 
                 taskLoggerHelper(`${taskName}: current task executes end, took ${new Date().getTime() - beginTime}ms`, randomKey)
             } catch (e) {
-                Logger.error(`${taskName}: task executes error, should release lock`);
-                await this.taskDispatchService.unlock(taskName, randomKey);
+                const {nModified, ok}: IMongooseUpdate = await this.taskDispatchService.unlock(taskName, randomKey);
+                taskLoggerHelper(`${taskName}: task executes error, release lock successfully? ${nModified == 1 && ok === 1}`);
                 if (this[`${taskName}_timer`]) {
                     clearInterval(this[`${taskName}_timer`]);
                     this[`${taskName}_timer`] = null;
