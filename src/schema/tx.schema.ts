@@ -41,6 +41,7 @@ export const TxSchema = new mongoose.Schema({
     tx_index: Number,
 }, { versionKey: false });
 
+
 //	csrb 浏览器交易记录过滤正则表达式
 function filterExTxTypeRegExp(): object {
     let RegExpStr:string = Cache.supportTypes.join('|');
@@ -59,6 +60,124 @@ function filterTxTypeRegExp(types: TxType[]): object {
     });
     return new RegExp(typeStr);
 }
+//复合索引当前面的索引匹配完以后, 剩下的量级小于1万, 不需要再加index
+TxSchema.index({'msgs.type':1, time:1});
+TxSchema.index({'msgs.type':1, height:1});
+TxSchema.index({height:1});
+TxSchema.index({tx_hash:1}, {unique: true});
+
+
+//按照目前的级别, 可以不需要再加二级索引 'msgs.type'
+TxSchema.index({'msgs.msg.name':1});
+TxSchema.index({'msgs.msg.id':1});
+TxSchema.index({'msgs.msg.consumer':1});
+TxSchema.index({'msgs.msg.provider':1});
+TxSchema.index({'msgs.msg.description':1});
+TxSchema.index({'msgs.msg.depositor':1});
+TxSchema.index({'msgs.msg.proposer':1});
+TxSchema.index({'msgs.msg.symbol':1});
+TxSchema.index({'msgs.msg.ex.request_context_id':1});
+TxSchema.index({'msgs.msg.ex.service_name':1});
+TxSchema.index({'msgs.msg.request_context_id':1});
+TxSchema.index({'events.attributes.value':1});
+
+
+/*
+* msgs.type, addrs 为多键
+*
+*
+* queryTxList: msgs.type  可能有(status, addrs, time)
+*
+* queryStakingTxList: msgs.type  可能有(status, addrs, time)
+*
+* queryDeclarationTxList: msgs.type  可能有(status, addrs, time)
+*
+* queryTxList_e:  可能有(msgs.type, height)
+*
+* queryTxWithHeight: msgs.type  可能有(height)
+*
+* queryTxWithAddress: msgs.type  可能有(addrs, status)
+*
+* queryTxWithContextId: msgs.type  可能有:
+*       status,
+*       (events.attributes.value,  or
+*       msgs.msg.ex.request_context_id,  or
+*       msgs.msg.request_context_id)
+*
+* queryTxWithNft: msgs.type    可能有(msgs.msg.denom, msgs.msg.id)
+*
+* queryTxDetailWithServiceName: msgs.msg.name, msg.type
+*
+* queryCallServiceWithConsumerAddr: msgs.type, msgs.msg.consumer, status
+*
+* queryRespondServiceWithContextId: msgs.type, msgs.msg.ex.request_context_id
+*
+* queryBindServiceWithProviderAddr:  msgs.type, msgs.msg.provider, status
+*
+* queryRespondCountWithServceName: msgs.type, msgs.msg.ex.service_name, msgs.msg.provider
+*
+* querydisableServiceBindingWithServceName: msgs.type, msgs.msg.service_name, msgs.msg.provider
+*
+* queryTxWithHash: tx_hash
+*
+* queryTxStatistics: msgs.type
+*
+* findCallServiceTxWithReqContextIds: msgs.type, events.attributes.key, events.attributes.value
+*
+* findAllServiceTx: msgs.type, msgs.msg.ex.service_name
+*
+* queryServiceName: msgs.type, events.attributes.key, events.attributes.value, status
+*
+* addExFieldForServiceTx: tx_hash
+*
+* queryDefineServiceTxHashByServiceName: msgs.type, msgs.msg.name
+*
+* findServiceAllList:msgs.type, status  可能有(msgs.msg.name   or  msgs.msg.description)
+*
+* findAllServiceCount: msgs.type, status  可能有(msgs.msg.name   or  msgs.msg.description)
+*
+* findBindServiceTxList: msgs.type, status, msgs.msg.service_name
+*
+* findProviderRespondTimesForService: msgs.msg.ex.service_name, msgs.type, msgs.msg.provider
+*
+* findServiceProviderCount: msgs.type, msgs.msg.name, msgs.msg.service_name
+*
+* findServiceTx: msgs.type, msgs.msg.ex.service_name, status
+*
+* findServiceTxCount: msgs.type, msgs.msg.ex.service_name, status
+*
+* findBindTx: msgs.msg.service_name, msgs.msg.provider, msgs.type, status
+*
+* findServiceOwner: msgs.msg.name, status, msgs.type
+*
+* queryServiceRespondTx: msgs.type, msgs.msg.ex.service_name, msgs.msg.provider
+*
+* findRespondServiceCount: msgs.msg.ex.service_name, msgs.type, status
+*
+* queryDenomTx: msgs.type, status  可能有(msgs.msg.name, msgs.msg.id)
+*
+* queryDenomTxCount: msgs.type, status  可能有(msgs.msg.name, msgs.msg.id)
+*
+* queryTxByDenom: msgs.type, status, msgs.msg.id
+*
+* queryTxByDenomIdAndNftId: status, msgs.msg.id, msgs.msg.denom, (msgs.type: or nft三种类型)
+*
+* queryListByCreateAndUpDateIdentity: height, (or  msgs.type)
+*
+* queryTxListByIdentity: msgs.type, msgs.msg.id  //在mongodb中查询, 始终会使用msgs.type排在第一位的index复合索引
+*
+* queryDepositsByAddress: msgs.type, status  (or   msgs.msg.depositor, msgs.msg.proposer)
+*
+* queryTxBySymbol: msgs.type, status, msgs.msg.symbol, time
+*
+* queryTxWithAsset: msgs.type   可能有 msgs.msg.symbol
+*
+* queryNftTxList: sort(height:1, tx_index:1), status, msgs.type, height
+*
+* queryMaxNftTxList: msgs.msg.type
+*
+*
+* */
 
 
 // 	txs
@@ -797,6 +916,7 @@ TxSchema.statics.queryTxByDenomIdAndNftId = async function (
         status: TxStatus.SUCCESS,
         'msgs.msg.id': nftId,
         'msgs.msg.denom': denomId,
+        //todo (lvshenchao) or -> in
         $or:[
             {
                 'msgs.type': TxType.transfer_nft,
@@ -823,10 +943,11 @@ TxSchema.statics.queryListByCreateAndUpDateIdentity = async function(
         height:{
             $gte:height
         },
+        //todo (lvshenchao) or -> in
         $or:[
             {
                 'msgs.type': TxType.create_identity,
-                status: TxStatus.SUCCESS,
+                status: TxStatus.SUCCESS,//todo(lvshenchao) or 条件一样, 不需要写在or语句里面
             },
             {
                 'msgs.type': TxType.update_identity,

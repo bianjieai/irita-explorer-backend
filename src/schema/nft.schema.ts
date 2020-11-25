@@ -25,9 +25,9 @@ export const NftSchema = new mongoose.Schema({
     hash: String,
     time: Number
 },{versionKey: false});
-NftSchema.index({ denom_id: 1, nft_id: 1 }, { unique: true });
-NftSchema.index({nft_id:1});
-NftSchema.index({owner:1});
+NftSchema.index({ nft_id: 1, denom_id: 1 }, { unique: true });
+NftSchema.index({ nft_name: 1, denom_id: 1 });
+NftSchema.index({denom_id:1});
 
 NftSchema.statics = {
     async findList(

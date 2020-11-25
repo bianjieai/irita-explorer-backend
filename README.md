@@ -2,6 +2,10 @@
 
 <p align="center">IRITA service end</p>
 
+## For Developer
+写查询语句的时候, 特别是sync_tx, ex_sync_nft表, 查询字段以及index需要随时维护:
+http://wiki.bianjie.ai/pages/viewpage.action?pageId=42960008
+
 ## Installation
 
 ```bash
