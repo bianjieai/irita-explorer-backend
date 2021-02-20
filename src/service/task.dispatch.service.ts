@@ -73,10 +73,10 @@ export class TaskDispatchService {
     async taskDispatchFaultTolerance(cb: DispatchFaultTolerance): Promise<void> {
         const taskList: ITaskDispatchStruct[] = await (this.taskDispatchModel as any).findAllLocked();
         if (taskList && taskList.length > 0) {
-            for(let task of taskList){
+            for (let task of taskList) {
                 //对比当前时间跟上次心跳更新时间的差值与 心率, 当大于两个心率周期的时候, 认为上一个执行task的实例发生故障
-                if ((getTimestamp() - task.heartbeat_update_time) >= cfg.taskCfg.interval.heartbeatRate * 2) {
-                    Logger.error(`${(task as any).name}: task executed breakdown, and reed to be released the lock`);
+                if ((getTimestamp() - task.heartbeat_update_time) >= (cfg.taskCfg.interval.heartbeatRate * 2)/1000) {
+                    Logger.warn(`${(task as any).name}: task executed breakdown, and reed to be released the lock`);
                     await this.releaseLockByName((task as any).name);
                     //出故障后, 释放锁, 也需要将出故障的timer清除;
                     cb((task as any).name);

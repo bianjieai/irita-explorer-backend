@@ -98,7 +98,7 @@ TaskDispatchSchema.statics = {
         }
 
         return await this.updateOne({ name, is_locked: true }, {
-            hearbeat_update_time: getTimestamp(),
+            heartbeat_update_time: getTimestamp(),
         }).exec();
     },
     async deleteOneByName(name: TaskEnum) {
