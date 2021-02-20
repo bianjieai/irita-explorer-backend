@@ -63,10 +63,11 @@ export class StakingValidatorTaskService {
             allValidatorsFromLcd[i].consensus_pubkey = getConsensusPubkey(allValidatorsFromLcd[i].consensus_pubkey['value'])
             let BlockProposer = getAddress(allValidatorsFromLcd[i].consensus_pubkey)
             allValidatorsFromLcd[i].proposer_addr = BlockProposer ? BlockProposer.toLocaleUpperCase() : null
-            await this.updateSlashInfo(allValidatorsFromLcd[i])
-            await this.updateSelfBond(allValidatorsFromLcd[i])
-            await this.updateIcons(allValidatorsFromLcd[i])
-            await this.updateUpTime(allValidatorsFromLcd[i])
+            await Promise.all([this.updateSlashInfo(allValidatorsFromLcd[i]),this.updateIcons(allValidatorsFromLcd[i]),this.updateUpTime(allValidatorsFromLcd[i])])
+            // await this.updateSlashInfo(allValidatorsFromLcd[i])
+            // await this.updateSelfBond(allValidatorsFromLcd[i])
+            // await this.updateIcons(allValidatorsFromLcd[i])
+            // await this.updateUpTime(allValidatorsFromLcd[i])
         }
     }
 
